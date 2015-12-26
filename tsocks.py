@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 #coding:utf8
+'''
+How to generate key and cert,on linux run:
+openssl genrsa 1024 > key.pem
+openssl req -new -x509 -nodes -sha1 -days 1095 -key key.pem > cert.pem
+'''
 
 import socket
 import struct
@@ -7,12 +12,16 @@ import argparse
 import sys
 import threading
 import select
+import ssl
 
 
 BUF_SIZE=4096
 FLAG = 0
 CMD = "ok"
 DEBUG=False
+SSL=False
+CERT=None
+KEY=None
 
 
 class Socks5proxy(object):
@@ -130,10 +139,19 @@ class Socks5proxy(object):
 		global FLAG
 		global CMD
 		global DEBUG
+		global SSL
+		#global CERT
 
 		try:
-			print daddr,dport
 			s1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			if SSL:
+				s1 = ssl.wrap_socket(s1,
+										#ca_certs=CERT,
+										ssl_version=ssl.PROTOCOL_TLSv1_2,
+										#cert_reqs=ssl.CERT_REQUIRED
+										)
+				if DEBUG:
+					print "[*]Cipher :",s1.cipher()
 			s1.connect((daddr,dport))
 			print "[*]Connected to relay server :", daddr,dport
 			while True:#loop and recv forward server send a cmd and product a new socket to do with socks5 proxy
@@ -155,8 +173,17 @@ class Socks5proxy(object):
 
 	def reverse_socks5_hand(self,daddr,dport):#reverse socks5 mode handsheak
 		global DEBUG
+		global SSL
 		try:
 			s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			if SSL:
+				s2 = ssl.wrap_socket(s2,
+										#ca_certs=CERT,
+										ssl_version=ssl.PROTOCOL_TLSv1_2,
+										#cert_reqs=ssl.CERT_REQUIRED
+										)
+				if DEBUG:
+					print "[*]Cipher :",s2.cipher()
 			s2.connect((daddr,dport))
 			if DEBUG:
 				print "[*]New socket start..."
@@ -232,6 +259,9 @@ class Socks5proxy(object):
 		global BUF_SIZE
 		global CMD
 		global DEBUG
+		global SSL
+		global CERT
+		global KEY
 
 		try:
 			sock_s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #listen on port1 socks5 server rev
@@ -253,6 +283,16 @@ class Socks5proxy(object):
 				if sock_s in rs:
 					if not con_cmd:#accept server reverse socket as cmd socket,if client has new connect,tell cmd socket
 						con_s, address1 = sock_s.accept()
+						if SSL:
+							con_s = ssl.wrap_socket(con_s, 
+								  server_side=True,
+								  certfile=CERT,
+								  #ca_certs=CERT,
+								  keyfile=KEY, 
+								  ssl_version=ssl.PROTOCOL_TLSv1_2
+								  )
+							if DEBUG:
+								print "[*]Cipher :",con_s.cipher()
 						print "[*]Client from :"+str(address1[0])+" :"+str(address1[1])+" on Port "+str(ports[0])
 						con_cmd =con_s
 
@@ -267,6 +307,16 @@ class Socks5proxy(object):
 					if con_cmd:#if cmd socket connected,send cmd,let server product a new socket as data trasport socket
 						con_s.send(CMD)
 						con_s_tun,con_s_tun_addr = sock_s.accept()#data trasport socket,and start a new thread
+						if SSL:
+							con_s_tun = ssl.wrap_socket(con_s_tun, 
+								  server_side=True,
+								  certfile=CERT,
+								  keyfile=KEY,
+								  #ca_certs=CERT, 
+								  ssl_version=ssl.PROTOCOL_TLSv1_2
+								  )
+							if DEBUG:
+								print "[*]Cipher :",con_s_tun.cipher()
 						threading.Thread(target=self.forward_translate, args=(con_s_tun,con_c)).start()
 		except Exception, e:
 			if DEBUG:
@@ -286,27 +336,55 @@ class Socks5proxy(object):
 
 def main():
 	global DEBUG
+	global SSL
+	global CERT
+	global KEY
 	parser = argparse.ArgumentParser(prog='tsocks', 
-						#description='Tsocks v1.0', 
+						description='tsocks v1.0', 
 						formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 						usage='''%(prog)s [options]
   tsocks -s -p 1028		Socks5 server mode
   tsocks -s -r 1.1.1.1 -p 8001	Reverse socks5 server mode
-  tsocks -f 8001 8002		Port forward mode''',
+  tsocks -f 8001 8002		Port forward mode
+  tsocks -s -S -r 1.1.1.1 -p 8001	Reverse socks5  with ssl
+  tsocks -f 8001 8002 -S -c cert.pem -k key.pem    Port forward with ssl
+  --------------------------------------------------------
+  generate key and cert:
+  openssl genrsa 1024 > key.pem
+  openssl req -new -x509 -nodes -sha1 -days 1095 -key key.pem > cert.pem''',
 						 )
 	parser.add_argument('-s','--server', action="store_true", default=False,help='Socks5 server mode')
-	parser.add_argument('-p','--port',metavar="PORT", dest='port', type=int, default=1080,help='Socks5 server mode listen port or remote port')
+	parser.add_argument('-p','--port',metavar="PORT",dest='port', type=int, default=1080,help='Socks5 server mode listen port or remote port')
 	parser.add_argument('-r','--remote',metavar="REMOTE_IP", type=str, default=None,help='Reverse socks5 server mode ,set remote relay IP')  
 	parser.add_argument('-f','--forward',nargs=2, metavar=('PORT_1', 'PORT_2'),default=(None),type=int,help='Set forward mode,server connect port_1,client connect port_2')
-	parser.add_argument('-d','--debug',action="store_true", default=False,help='Set debug mode,will show debug information')  
+	parser.add_argument('-d','--debug',action="store_true", default=False,help='Set debug mode,will show debug information')
+	parser.add_argument('-S','--ssl',action="store_true", default=False,help='Set ssl encrypt data,just support reverse proxy mode,relay server must also active ssl')
+	parser.add_argument('-c','--cert',metavar='CERT_FILE', type=str,default="cert.pem",help='Set ssl encrypt mode cert file path,only set on relay server')
+	parser.add_argument('-k','--key',metavar='KEY_FILE', type=str,default="key.pem",help='Set ssl encrypt mode key file path,only set on relay server')
+
 	args = parser.parse_args()
 	DEBUG = args.debug
+	SSL =args.ssl
+	CERT = args.cert
+	KEY = args.key
+
 	if len(sys.argv) == 1:
 		parser.print_help()
 		sys.exit(1)
-	elif (args.server and args.forward):
+	if (args.server and args.forward):
 		print "[-]Socks5 or forward mode only one..."
 		sys.exit(1)
+	if (args.ssl and args.forward):
+		try:
+			f_1=open(args.cert)
+			f_1.close()
+			f_2=open(args.key)
+			f_2.close()
+		except Exception, e:
+			if DEBUG:
+				raise e
+			print "[-]Cert or key file not exist or error..."
+			sys.exit(1)
 
 	if args.server:
 		if args.remote: #start reverse socks5 mode
@@ -317,7 +395,7 @@ def main():
 			while True:
 				losocks5 = Socks5proxy()
 				losocks5.local_socks5(args.port)
-	elif args.forward: #start port farward mode
+	if args.forward: #start port farward mode
 		while True:
 			lforward = Socks5proxy()
 			lforward.forward_main(args.forward)
