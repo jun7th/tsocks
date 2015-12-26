@@ -12,18 +12,18 @@ Use socks proxy server to connect to this server's public network ip and 1080 po
 ```
 ### 2. The target server in the intranet, our machine is also in the intranet:
 ```
-First on the VPS run:
+First on the internet server(if iP is 1.1.1.1) run:
 tsocks -f 8001 8002
 ON the intranet server run:
-tsocks -s -r vpsip -p 8001
+tsocks -s -r 1.1.1.1 -p 8001
 In this machine socks5 proxy connection port VPS 8002
 ```
 ## or use ssl:
 ```
-First on the VPS run:
+First on the internet server(if iP is 1.1.1.1) run:
 tsocks -f 443 8002 -S -c cert.pem -k key.pem
 ON the intranet server run:
-tsocks -s -S -r vpsip -p 8001
+tsocks -s -S -r 1.1.1.1 -p 443
 In this machine socks5 proxy connection port VPS 8002
 ```
 
@@ -38,18 +38,18 @@ tsocks -s -p 1080
 ```
 ### 2.目标服务器处于内网，本机也处于内网：
 ```
-首先在vps上面运行：
+首先在公网服务器(假如ip是 1.1.1.1)上面运行：
 tsocks -f 8001 8002
 在内网服务器上面运行：
-tsocks -s -r vpsip -p 8001
+tsocks -s -r 1.1.1.1 -p 8001
 在本机使用socks5代理连接vps的8002端口
 ```
 ## 或者使用ssl:
 ```
-首先在vps上面运行：
+首先在公网服务器(假如ip是 1.1.1.1)上面运行：
 tsocks -f 443 8002 -S -c cert.pem -k key.pem
 在内网服务器上面运行：
-tsocks -s -S -r vpsip -p 8001
+tsocks -s -S -r 1.1.1.1 -p 443
 在本机使用socks5代理连接vps的8002端口
 ```
 
@@ -58,7 +58,7 @@ usage: tsocks [options]
   tsocks -s -p 1028		Socks5 server mode
   tsocks -s -r 1.1.1.1 -p 8001	Reverse socks5 server mode
   tsocks -f 8001 8002		Port forward mode
-  tsocks -s -S -r 1.1.1.1 -p 8001	Reverse socks5  with ssl
+  tsocks -s -S -r 1.1.1.1 -p 443	Reverse socks5  with ssl
   tsocks -f 443 8002 -S -c cert.pem -k key.pem    Port forward with ssl
   --------------------------------------------------------
   generate key and cert:
