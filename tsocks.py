@@ -346,7 +346,7 @@ def main():
   tsocks -s -p 1028		Socks5 server mode
   tsocks -s -r 1.1.1.1 -p 8001	Reverse socks5 server mode
   tsocks -f 8001 8002		Port forward mode
-  tsocks -s -S -r 1.1.1.1 -p 8001	Reverse socks5  with ssl
+  tsocks -s -S -r 1.1.1.1 -p 443	Reverse socks5  with ssl
   tsocks -f 443 8002 -S -c cert.pem -k key.pem    Port forward with ssl
   --------------------------------------------------------
   generate key and cert:
