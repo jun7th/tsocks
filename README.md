@@ -4,7 +4,7 @@ A reverse socks5 proxy server whith port forwarding mode and forward server mode
 Socks is a small program that has socks5 reverse proxy functionality, with the port forwarding agent can archieve intranet to intranet, but also has a positive socks5 proxy server.
 Usage:
 
-### 1. On the server has two network cards, one of the card is connected within a intranet, another cards connect to internet (public network ip):
+### 1. On the server has two network adapter, one of the adapter is connected within a intranet, another one connect to internet (public network ip):
 ```
 On the target server run:
 tsocks -s -p 1080
